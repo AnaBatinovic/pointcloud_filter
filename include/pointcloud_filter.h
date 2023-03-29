@@ -21,16 +21,12 @@ typedef pcl::PointCloud<pcl::PointXYZ> pcXYZ;
 
 namespace PointcloudFilter {
 
-	void filter ( int argc, char** argv, 
-				string pointcloud_sub_topic, 
-                string mask_sub_topic,
-                string patch_mask_sub_topic,
-				string filtered_pointcloud_pub_topic, 
-				string closest_point_distance_pub_topic,
-				string closest_point_base_distance_pub_topic,
-				string patch_centroid_pub_topic,
-				string patch_centroid_filtered_pub_topic,
-				string camera_frame );
+	void filter ( int argc, char** argv, string pointcloud_sub_topic, 
+					string mask_sub_topic, string filtered_pointcloud_pub_topic, 
+					string closest_point_distance_pub_topic,
+					string object_centroid_pub_topic,
+					string object_marker_pub_topic,
+					string camera_frame, string world_frame);
 
 	// removeNonMaskValues 
 	// returns pointloud containing 'inputCloud' points corresponding 
@@ -42,7 +38,11 @@ namespace PointcloudFilter {
 
 	pcXYZ::Ptr doOutlierFiltering( pcXYZ::Ptr inputCloud , ros::NodeHandle&);
 
-	//pcXYZ::Ptr transformCloud(pcXYZ::Ptr inputCloud, string goal_frame, tf::TransformListener tf_listener);
+	geometry_msgs::PointStamped transformCentroid(std::vector<double> centroid, 
+		string world_frame, string camera_frame, tf::TransformListener &tf_listener);
+	
+	pcXYZ::Ptr transformCloud(pcXYZ::Ptr inputCloud, 
+		string goal_frame, tf::TransformListener &tf_listener);
 
 	vector <Eigen::Vector3d> pointIndicesToInlierPoints ( pcXYZ::Ptr inputCloud, 
 		pcl::PointIndices::Ptr inliers);
@@ -57,6 +57,8 @@ namespace PointcloudFilter {
       * Returns cloud centroid
       */
     std::vector<double> findCentroid(pcXYZ::Ptr inputCloud);
+
+	void visualizeCentorid(geometry_msgs::PointStamped point, string frame);
 	
 };
 

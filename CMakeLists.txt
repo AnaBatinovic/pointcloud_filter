@@ -5,14 +5,10 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
   tf
-	dynamic_reconfigure
-	roslib
-	cv_bridge
-	image_transport
-)
-
-generate_dynamic_reconfigure_options(
-	config/BrickDistanceParameters.cfg
+  dynamic_reconfigure
+  roslib
+  cv_bridge
+  image_transport
 )
 
 find_package(PCL 1.7 REQUIRED)
@@ -36,7 +32,7 @@ include_directories( include
 add_executable(pointcloud_filter
   src/main.cpp
   src/pc_pub_sub.cpp
-  src/pointcloud_filter.cpp
+  src/depth_image_pointcloud_filter.cpp
 )
 
 ## Specify libraries to link a library or executable target against

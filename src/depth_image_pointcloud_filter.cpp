@@ -1,12 +1,11 @@
 /*
- * brick_detection.cpp
- *
- *  Created on: Mar 21, 2019
- *      Author: a
+ * Find distance of the segmented object
+ * Code from pointcloud_filter.cpp
+ *  Created on: Mar 28, 2023
+ *      Author: Ana Milas
  */
 
 #include "pointcloud_filter.h"
-#include "KalmanDetection.h"
 #include <pcl/filters/statistical_outlier_removal.h>
 
 #define NO_CONOUTS_ERROR -1
@@ -14,36 +13,22 @@
 void PointcloudFilter::filter ( int argc, char** argv, 
 								string pointcloud_sub_topic, 
 								string mask_sub_topic,
-								string patch_mask_sub_topic,
 								string filtered_pointcloud_pub_topic, 
 								string closest_point_distance_pub_topic,
-								string closest_point_base_distance_pub_topic,
-								string patch_centroid_pub_topic,
-								string patch_centroid_filtered_pub_topic,
-								string camera_frame ) 
+								string object_centroid_pub_topic,
+								string object_marker_pub_topic,
+								string camera_frame,
+								string world_frame) 
 {
 	ros::init(argc, argv, "pc_filter");
 	ros::NodeHandle nodeHandle("~");
 
-	PC_PUB_SUB pcl_pub_sub(	nodeHandle, pointcloud_sub_topic, mask_sub_topic, patch_mask_sub_topic,
+	PC_PUB_SUB pcl_pub_sub(	nodeHandle, pointcloud_sub_topic, mask_sub_topic,
 							filtered_pointcloud_pub_topic, closest_point_distance_pub_topic,
-							closest_point_base_distance_pub_topic, patch_centroid_pub_topic, 
-							patch_centroid_filtered_pub_topic);
+						    object_centroid_pub_topic, object_marker_pub_topic);
 	ros::Rate loop_rate(50);
-	tf::TransformListener tf_listener;
 	ros::Duration(3.0).sleep();
-
-	KalmanDetection KFabsBrickDistance("brick");
-	KalmanDetection KFpatchCentroidX("centroid_x");
-	KalmanDetection KFpatchCentroidY("centroid_y");
-	KalmanDetection KFpatchCentroidZ("centroid_z");
-
-	double dt = 1.0 / 50.0;
-	KFabsBrickDistance.initializeParameters(nodeHandle);
-	KFpatchCentroidX.initializeParameters(nodeHandle);
-	KFpatchCentroidY.initializeParameters(nodeHandle);
-	KFpatchCentroidZ.initializeParameters(nodeHandle);
-
+	tf::TransformListener listener;
 	while(nodeHandle.ok())
 	{
 		ros::spinOnce();
@@ -55,76 +40,71 @@ void PointcloudFilter::filter ( int argc, char** argv,
 		continue;
 		}
 
-		pcXYZ::Ptr filteredCloud ( new pcXYZ ), patchCloud( new pcXYZ );
+		pcXYZ::Ptr filteredCloud ( new pcXYZ ), maskCloud( new pcXYZ );
 
-		// filteredCloud = removeNonMaskValues(originalCloud, pcl_pub_sub.getMask());
-		// filteredCloud = removeNaNValues(filteredCloud);
-		// filteredCloud = doOutlierFiltering(filteredCloud, nodeHandle);
-
-		patchCloud = removeNonMaskValues(originalCloud, pcl_pub_sub.getPatchMask());
-		patchCloud = removeNaNValues(patchCloud);
-		if (!patchCloud->empty()) {
-			patchCloud = doOutlierFiltering(patchCloud, nodeHandle);
-		}
-
-		//pcl_pub_sub.publishPointCloud(filteredCloud, camera_frame);
-		std::vector<double> minDistances, patchCentroid;
-		if (pcl_pub_sub.nContours == 0) {
-			//cout << "trazi closest od org clouda!" << endl << endl;
-			minDistances = std::vector<double>(4, NO_CONOUTS_ERROR);
-			patchCentroid = std::vector<double>(3, NO_CONOUTS_ERROR);
-		}
-		else {
-		    minDistances = findClosestDistance(filteredCloud);
-		    patchCentroid = findCentroid(patchCloud);
-		}
+		filteredCloud = removeNonMaskValues(originalCloud, pcl_pub_sub.getMask());
+		// std::cout << "Point cloud size: " << filteredCloud->size() << std::endl;
+		filteredCloud = removeNaNValues(filteredCloud);
+		// Find object pose in camera frame
+		std::vector<double> minDistances, objectCentroid;
+		minDistances = findClosestDistance(filteredCloud);
+		objectCentroid = findCentroid(filteredCloud);
+		
+		// Transform centroid and distance to global frame
+		geometry_msgs::PointStamped objectTransformedCentroid;
+		objectTransformedCentroid = transformCentroid(objectCentroid, world_frame, 
+			camera_frame, listener);
+		
 		// Publish the absolute distance
 		pcl_pub_sub.publishDistance(minDistances[3]);
-		pcl_pub_sub.publishPatchCentroidVector(patchCentroid);
+		// Publish object centroid in global frame
+		pcl_pub_sub.publishObjectCentroid(objectTransformedCentroid);
+		pcl_pub_sub.visualizeCentorid(objectTransformedCentroid, world_frame);
 
-		bool newMeas = pcl_pub_sub.newMeasurementRecieved();
-		// Do the Kalman Filter Here
-		// KFabsBrickDistance.filterCurrentDistance(dt, minDistances[3], newMeas);
-		KFpatchCentroidX.filterCurrentDistance(dt, patchCentroid[0], newMeas);
-		KFpatchCentroidY.filterCurrentDistance(dt, patchCentroid[1], newMeas);
-		KFpatchCentroidZ.filterCurrentDistance(dt, patchCentroid[2], newMeas);
-		// KFabsBrickDistance.publish();
-		pcl_pub_sub.resetNewMeasurementFlag();
-
-		pcl_pub_sub.publishPatchCentroidFilteredVector(
-			std::vector<double> {
-				KFpatchCentroidX.getState(),
-				KFpatchCentroidY.getState(),
-				KFpatchCentroidZ.getState()
-			}
-		);
-		pcXYZ::Ptr transformedFilteredCloud ( new pcXYZ );
-		string goal_frame = "base_link";
-
-		tf::StampedTransform temp_trans;
-
-		pcl_pub_sub.publishPointCloud(patchCloud, patchCloud->header.frame_id);
-		pcl_pub_sub.publishBaseDistance( minDistances[0] );
+		// std::cout << "Point cloud size: " << maskCloud->size() << std::endl;
+		// Transform filtered cloud and publish it
+		pcXYZ::Ptr transformedFilteredCloud (new pcXYZ);
+		transformedFilteredCloud = transformCloud(filteredCloud, world_frame, listener);
+		pcl_pub_sub.publishPointCloud(transformedFilteredCloud, world_frame);
 	}
 }
-/*
-pcXYZ::Ptr PointcloudFilter::transformCloud(pcXYZ::Ptr inputCloud, string goal_frame, tf::TransformListener tf_listener) 
-{
-	//cout << "input frame_id = " << inputCloud->header.frame_id << endl << endl;
-	pcXYZ::Ptr outputCloud ( new pcXYZ );
 
-	//tf::TransformListener tf_listener(ros::Duration(1));
-	tf::StampedTransform temp_trans;
-	//cout << "input_frame_id" << inputCloud->header.frame_id << endl << endl;
-	//tf_listener.waitForTransform( goal_frame, inputCloud->header.frame_id, ros::Time(0), ros::Duration(1));
-	tf_listener.lookupTransform( goal_frame, inputCloud->header.frame_id, ros::Time(0), temp_trans);
+geometry_msgs::PointStamped PointcloudFilter::transformCentroid(
+	std::vector<double> centroid, string world_frame, 
+	string camera_frame, tf::TransformListener &tf_listener) 
+{
+	try
+	{
+		ros::Time now = ros::Time::now();
+		tf::StampedTransform transform;
+		tf_listener.waitForTransform(world_frame, camera_frame, now, ros::Duration(2.0));
+		tf_listener.lookupTransform(world_frame, camera_frame, now, transform);
+	}
+		catch (tf::TransformException ex)
+	{
+		ROS_ERROR("%s",ex.what());
+	}
+	geometry_msgs::PointStamped objectCentroidLocal, objectCentroidGlobal;
+	objectCentroidLocal.header.frame_id = camera_frame;
+    objectCentroidLocal.point.x = centroid[0];
+    objectCentroidLocal.point.y = centroid[1];
+    objectCentroidLocal.point.z = centroid[2];
+	tf_listener.transformPoint(world_frame, objectCentroidLocal, objectCentroidGlobal);
+	return objectCentroidGlobal;
+}
+
+pcXYZ::Ptr PointcloudFilter::transformCloud(pcXYZ::Ptr inputCloud, 
+	string goal_frame, tf::TransformListener &tf_listener) 
+{
+	pcXYZ::Ptr outputCloud (new pcXYZ);
+	ros::Time now = ros::Time::now();
+	tf::StampedTransform transform;
+	tf_listener.waitForTransform(goal_frame, inputCloud->header.frame_id, now, ros::Duration(2.0));
+	tf_listener.lookupTransform(goal_frame, inputCloud->header.frame_id, now, transform);
 	
-	pcl_ros::transformPointCloud(*inputCloud, *outputCloud, temp_trans);
-	//pcl_ros::transformPointCloud(goal_frame, *inputCloud, *outputCloud, tf_listener);
+	pcl_ros::transformPointCloud(*inputCloud, *outputCloud, transform);
 	return outputCloud;
 }
- */
-
 
 pcXYZ::Ptr PointcloudFilter::doOutlierFiltering( pcXYZ::Ptr inputCloud , ros::NodeHandle& nh)
 {
@@ -224,8 +204,9 @@ pcXYZ::Ptr PointcloudFilter::removeNaNValues ( pcXYZ::Ptr inputCloud )
 	pcl::removeNaNFromPointCloud ( *inputCloud, *tempCloud, indices );
 	return tempCloud;
 }
-pcXYZ::Ptr PointcloudFilter::removeNonMaskValues( pcXYZ::Ptr inputCloud, 
-												vector <vector <int>> mask )
+
+pcXYZ::Ptr PointcloudFilter::removeNonMaskValues(pcXYZ::Ptr inputCloud,
+                                                 vector<vector<int>> mask)
 {
 	
 	pcXYZ::Ptr tempCloud ( new pcXYZ );
@@ -237,7 +218,8 @@ pcXYZ::Ptr PointcloudFilter::removeNonMaskValues( pcXYZ::Ptr inputCloud,
 	tempCloud->width = 0;
 	for (int i = 0; i < mask.size(); i++) {
 		for (int j = 0; j < mask[0].size(); j++) {
-			if (mask[i][j] > 200) {
+			// std::cout << mask[i][j] << std::endl;
+			if (mask[i][j] > 0) {
 				tempCloud->width++;
 				tempCloud->points.push_back(inputCloud->at(j,i));
 			}
@@ -245,6 +227,5 @@ pcXYZ::Ptr PointcloudFilter::removeNonMaskValues( pcXYZ::Ptr inputCloud,
 	}
 	return tempCloud;
 }
-
 
 

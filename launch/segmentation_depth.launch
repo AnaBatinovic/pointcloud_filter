@@ -1,0 +1,14 @@
+<launch>
+    <arg name="namespace" default="$(env UAV_NAMESPACE)"/>
+    
+    <arg name="depth_topic" default="camera/depth_registered/points"/>
+    <arg name="mask_topic" default="segmentation/color/image_raw"/>
+    <arg name="world_frame" default="/mavros/world"/>
+    <arg name="camera_frame" default="/red/camera"/>
+
+    <node name="pointcloud_filter" type="pointcloud_filter" pkg="pointcloud_filter" ns="$(arg namespace)" output="screen">
+        <remap from="camera/depth_registered/points" to="$(arg depth_topic)"/>
+        <remap from="world_frame" to="$(arg world_frame)"/>
+        <remap from="camera_frame" to="$(arg camera_frame)"/>
+    </node>
+</launch>

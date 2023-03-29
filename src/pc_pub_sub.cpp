@@ -1,28 +1,21 @@
 #include "pc_pub_sub.h"
-
+static const std::string OPENCV_WINDOW = "Image window";
 PC_PUB_SUB::PC_PUB_SUB(	ros::NodeHandle& nodeHandle,
                         string pointcloud_sub_topic,
                         string mask_sub_topic,
-                        string patch_mask_sub_topic,
                         string filtered_pointcloud_pub_topic,
                         string closest_point_distance_pub_topic,
-                        string closest_point_base_distance_pub_topic,
-                        string patch_centroid_pub_topic,
-						string patch_centroid_filtered_pub_topic)
+                        string object_centroid_pub_topic,
+						string object_marker_pub_topic)
 {
 	nodeHandle_ = nodeHandle;
 	registerPointCloudSubscriber(pointcloud_sub_topic);
-	registerNContoursSubscriber();
 	if (mask_sub_topic != "none")
 		registerImageSubscriber(mask_sub_topic);
-	if (patch_mask_sub_topic != "none")
-	    registerPatchImageSubscriber(patch_mask_sub_topic);
-
 	registerPointCloudPublisher(filtered_pointcloud_pub_topic);
 	registerDistancePublisher(closest_point_distance_pub_topic);
-	registerBaseDistancePublisher(closest_point_base_distance_pub_topic);
-	registerPatchCentroidPublisher(patch_centroid_pub_topic);
-	registerPatchCentroidFilteredPublisher(patch_centroid_filtered_pub_topic);
+	registerObjectCentroidPublisher(object_centroid_pub_topic);
+	visualizationPublisher(object_marker_pub_topic);
 }
 
 PC_PUB_SUB::~PC_PUB_SUB() 
@@ -37,17 +30,6 @@ void PC_PUB_SUB::registerImageSubscriber(string topic)
 {
 	sub_mask_ = nodeHandle_.subscribe(topic, 1, &PC_PUB_SUB::rosMaskImageCallback, this);
 }
-
-void PC_PUB_SUB::registerNContoursSubscriber()
-{
-	sub_nContours_ = nodeHandle_.subscribe("/color_filter/nContours", 1, &PC_PUB_SUB::rosNContoursCallback, this);
-}
-
-void PC_PUB_SUB::registerPatchImageSubscriber(string topic)
-{
-    sub_patch_mask_ = nodeHandle_.subscribe(topic, 1, &PC_PUB_SUB::rosPatchMaskImageCallback, this);
-}
-
 void PC_PUB_SUB::registerPointCloudPublisher(string topic) 
 {
 	pub_pc2_ = nodeHandle_.advertise<sensor_msgs::PointCloud2>(topic, 1000);
@@ -56,18 +38,14 @@ void PC_PUB_SUB::registerDistancePublisher(string topic)
 {
 	pub_distance_ = nodeHandle_.advertise<std_msgs::Float32>(topic, 1000);
 }
-void PC_PUB_SUB::registerBaseDistancePublisher(string topic)
+void PC_PUB_SUB::registerObjectCentroidPublisher(string topic)
 {
-	pub_base_distance_ = nodeHandle_.advertise<std_msgs::Float32>(topic, 1000);
+    pub_object_centroid_ = nodeHandle_.advertise<geometry_msgs::PointStamped>(topic, 1000);
 }
-void PC_PUB_SUB::registerPatchCentroidPublisher(string topic)
+void PC_PUB_SUB::visualizationPublisher(string topic)
 {
-    pub_patch_centroid_ = nodeHandle_.advertise<geometry_msgs::PointStamped>(topic, 1000);
-}
-void PC_PUB_SUB::registerPatchCentroidFilteredPublisher(string topic)
-{
-	pub_patch_centroid_filtered_ = nodeHandle_.advertise<geometry_msgs::PointStamped>(topic, 1000);
-}
+	pub_object_marker_ = nodeHandle_.advertise<visualization_msgs::Marker>(topic, 10);	
+} 
 void PC_PUB_SUB::rosPointCloudCallback(const sensor_msgs::PointCloud2::ConstPtr& ros_msg) 
 {
 	pcl::PointCloud<pcl::PointXYZ>::Ptr pcl_msg(new pcl::PointCloud<pcl::PointXYZ>);
@@ -80,12 +58,6 @@ void PC_PUB_SUB::rosPointCloudCallback(const sensor_msgs::PointCloud2::ConstPtr&
 	this->organizedCloudPtr = pcl_msg;
 	_newMeasurement = true;
 }
-
-void PC_PUB_SUB::rosNContoursCallback(const std_msgs::Int32::Ptr& ros_msg) 
-{
-	this->nContours = ros_msg->data;
-}
-
 void PC_PUB_SUB::resetNewMeasurementFlag()
 {
 	_newMeasurement = false;
@@ -96,19 +68,44 @@ bool PC_PUB_SUB::newMeasurementRecieved()
 	return _newMeasurement;
 }
 
-void PC_PUB_SUB::rosMaskImageCallback(const sensor_msgs::CompressedImage::ConstPtr &ros_msg)
+void PC_PUB_SUB::rosMaskImageCallback(const sensor_msgs::Image::ConstPtr &ros_msg)
 {
-    processRosImage(ros_msg, mask);
+	cv_bridge::CvImagePtr cv_ptr;
+	try
+	{
+		cv_ptr = cv_bridge::toCvCopy(ros_msg, sensor_msgs::image_encodings::MONO8);
+	}
+		catch (cv_bridge::Exception& e)
+	{
+		ROS_ERROR("cv_bridge exception: %s", e.what());
+	}
+	// Update GUI Window
+    // cv::imshow(OPENCV_WINDOW, cv_ptr->image);
+    // cv::waitKey(3);
+	cv::Mat image;
+	image = cv_ptr->image;
+	int width = image.cols;
+	int height = image.rows;
+	int _stride = image.step;
+	uint8_t *myData = image.data;
+	vector <vector <int>> image_mat;
+	int sum = 0;
+	for (int i = 0; i < height; i++) {
+		vector <int> temp_vec;
+		for (int j = 0; j < width; j++) {
+			int d = *(image.data + i * width +j);
+			temp_vec.push_back( *(image.data + i * width +j));
+		}
+		image_mat.push_back(temp_vec);
+	}
+
+    mask = image_mat;
 }
 
-void PC_PUB_SUB::rosPatchMaskImageCallback(const sensor_msgs::CompressedImage::ConstPtr &ros_msg)
+void PC_PUB_SUB::processRosImage(const sensor_msgs::Image::ConstPtr &ros_msg, vector<vector<int> > &mask)
 {
-    processRosImage(ros_msg, patch_mask_);
-}
-
-void PC_PUB_SUB::processRosImage(const sensor_msgs::CompressedImage::ConstPtr &ros_msg, vector<vector<int> > &mask)
-{
-	cv::Mat image = cv::imdecode(cv::Mat(ros_msg->data), -1);
+	// std::cout << ros_msg->data.size() << std::endl;
+	cv::Mat image = cv::imdecode(cv::Mat(ros_msg->data), cv::IMREAD_GRAYSCALE);
 	int width = image.cols;
 	int height = image.rows;
 	int _stride = image.step;
@@ -141,10 +138,6 @@ vector< vector <int>> PC_PUB_SUB::getMask() {
 	return mask;
 }
 
-vector< vector <int>> PC_PUB_SUB::getPatchMask() {
-    return patch_mask_;
-}
-
 void PC_PUB_SUB::publishPointCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr pointCloud, string camera_frame) 
 {
 	sensor_msgs::PointCloud2::Ptr ros_msg(new sensor_msgs::PointCloud2);
@@ -168,30 +161,45 @@ void PC_PUB_SUB::publishDistance(double distance)
 	pub_distance_.publish(*msg);
 }
 
-void PC_PUB_SUB::publishBaseDistance(double distance) 
+void PC_PUB_SUB::publishObjectCentroid(geometry_msgs::PointStamped centroid)
 {
-	std_msgs::Float32::Ptr msg(new std_msgs::Float32);
-
-	msg->data = distance;
-	pub_base_distance_.publish(*msg);
+   pub_object_centroid_.publish(centroid);
 }
 
-void PC_PUB_SUB::publishPatchCentroidVector(const vector< double> &centroid)
+void PC_PUB_SUB::publishObjectCentroidVector(const vector< double> &centroid)
 {
   geometry_msgs::PointStamped msg;
    msg.header.stamp = ros::Time::now();
    msg.point.x = centroid[0];
    msg.point.y = centroid[1];
    msg.point.z = centroid[2];
-   pub_patch_centroid_.publish(msg);
+   pub_object_centroid_.publish(msg);
 }
 
-void PC_PUB_SUB::publishPatchCentroidFilteredVector(const vector<double>& centroid)
+void PC_PUB_SUB::visualizeCentorid(geometry_msgs::PointStamped point, string frame)
 {
-	geometry_msgs::PointStamped msg;
-	msg.header.stamp = ros::Time::now();
-	msg.point.x = centroid[0];
-	msg.point.y = centroid[1];
-	msg.point.z = centroid[2];
-	pub_patch_centroid_filtered_.publish(msg);
+	// Visualisation marker
+	visualization_msgs::Marker marker;
+	marker.header.stamp = ros::Time::now();
+	marker.header.frame_id = frame;
+	marker.id = 1;
+	marker.ns = "point";
+	marker.type = 2;
+	marker.action = 0;
+	marker.pose.position.x = point.point.x;
+	marker.pose.position.y = point.point.y;
+	marker.pose.position.z = point.point.z;
+	marker.pose.orientation.x = 0.0;
+	marker.pose.orientation.y = 0.0;
+	marker.pose.orientation.z = 0.0;
+	marker.pose.orientation.w = 1.0;
+	marker.scale.x = 0.25;
+	marker.scale.y = 0.25;
+	marker.scale.z = 0.25;
+	marker.color.a = 1.0;
+	marker.color.r = 1.0; // Orange
+	marker.color.g = 0.549;
+	marker.color.b = 0.0;
+	marker.lifetime = ros::Duration(100);
+	pub_object_marker_.publish(marker);
 }
