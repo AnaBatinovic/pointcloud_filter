@@ -16,6 +16,7 @@ void PointcloudFilter::filter ( int argc, char** argv,
 								string filtered_pointcloud_pub_topic, 
 								string closest_point_distance_pub_topic,
 								string object_centroid_pub_topic,
+								string object_pub_topic,
 								string object_marker_pub_topic,
 								string camera_frame,
 								string world_frame) 
@@ -25,10 +26,11 @@ void PointcloudFilter::filter ( int argc, char** argv,
 
 	PC_PUB_SUB pcl_pub_sub(	nodeHandle, pointcloud_sub_topic, mask_sub_topic,
 							filtered_pointcloud_pub_topic, closest_point_distance_pub_topic,
-						    object_centroid_pub_topic, object_marker_pub_topic);
-	ros::Rate loop_rate(50);
+						    object_centroid_pub_topic, object_pub_topic, object_marker_pub_topic);
+	ros::Rate loop_rate(20);
 	ros::Duration(3.0).sleep();
 	tf::TransformListener listener;
+	semantic_segmentation_ros::SegmentationObject object;
 	while(nodeHandle.ok())
 	{
 		ros::spinOnce();
@@ -66,6 +68,11 @@ void PointcloudFilter::filter ( int argc, char** argv,
 		pcXYZ::Ptr transformedFilteredCloud (new pcXYZ);
 		transformedFilteredCloud = transformCloud(filteredCloud, world_frame, listener);
 		pcl_pub_sub.publishPointCloud(transformedFilteredCloud, world_frame);
+
+		// Publish SegmenatationObject
+		object.name = pcl_pub_sub.getName();
+		object.point = objectTransformedCentroid;
+		pcl_pub_sub.publishObject(object);
 	}
 }
 

@@ -25,6 +25,7 @@ namespace PointcloudFilter {
 					string mask_sub_topic, string filtered_pointcloud_pub_topic, 
 					string closest_point_distance_pub_topic,
 					string object_centroid_pub_topic,
+					string object_pub_topic,
 					string object_marker_pub_topic,
 					string camera_frame, string world_frame);
 

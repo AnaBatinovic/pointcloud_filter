@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   roslib
   cv_bridge
   image_transport
+  semantic_segmentation_ros
 )
 
 find_package(PCL 1.7 REQUIRED)

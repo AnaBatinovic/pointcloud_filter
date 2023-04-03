@@ -6,15 +6,17 @@ PC_PUB_SUB::PC_PUB_SUB(	ros::NodeHandle& nodeHandle,
                         string filtered_pointcloud_pub_topic,
                         string closest_point_distance_pub_topic,
                         string object_centroid_pub_topic,
+						string object_pub_topic,
 						string object_marker_pub_topic)
 {
 	nodeHandle_ = nodeHandle;
 	registerPointCloudSubscriber(pointcloud_sub_topic);
 	if (mask_sub_topic != "none")
-		registerImageSubscriber(mask_sub_topic);
+		registerNameMaskSubscriber(mask_sub_topic);
 	registerPointCloudPublisher(filtered_pointcloud_pub_topic);
 	registerDistancePublisher(closest_point_distance_pub_topic);
 	registerObjectCentroidPublisher(object_centroid_pub_topic);
+	registerObjectPublisher(object_pub_topic);
 	visualizationPublisher(object_marker_pub_topic);
 }
 
@@ -26,9 +28,9 @@ void PC_PUB_SUB::registerPointCloudSubscriber(string topic)
 {
 	sub_pc2_ = nodeHandle_.subscribe(topic, 1, &PC_PUB_SUB::rosPointCloudCallback, this);
 }
-void PC_PUB_SUB::registerImageSubscriber(string topic) 
+void PC_PUB_SUB::registerNameMaskSubscriber(string topic) 
 {
-	sub_mask_ = nodeHandle_.subscribe(topic, 1, &PC_PUB_SUB::rosMaskImageCallback, this);
+	sub_mask_ = nodeHandle_.subscribe(topic, 1, &PC_PUB_SUB::rosNameMaskCallback, this);
 }
 void PC_PUB_SUB::registerPointCloudPublisher(string topic) 
 {
@@ -41,6 +43,10 @@ void PC_PUB_SUB::registerDistancePublisher(string topic)
 void PC_PUB_SUB::registerObjectCentroidPublisher(string topic)
 {
     pub_object_centroid_ = nodeHandle_.advertise<geometry_msgs::PointStamped>(topic, 1000);
+}
+void PC_PUB_SUB::registerObjectPublisher(string topic)
+{
+    pub_object_ = nodeHandle_.advertise<semantic_segmentation_ros::SegmentationObject>(topic, 1000);
 }
 void PC_PUB_SUB::visualizationPublisher(string topic)
 {
@@ -68,12 +74,12 @@ bool PC_PUB_SUB::newMeasurementRecieved()
 	return _newMeasurement;
 }
 
-void PC_PUB_SUB::rosMaskImageCallback(const sensor_msgs::Image::ConstPtr &ros_msg)
+void PC_PUB_SUB::rosNameMaskCallback(const semantic_segmentation_ros::SegmentationNameMask &ros_msg)
 {
 	cv_bridge::CvImagePtr cv_ptr;
 	try
 	{
-		cv_ptr = cv_bridge::toCvCopy(ros_msg, sensor_msgs::image_encodings::MONO8);
+		cv_ptr = cv_bridge::toCvCopy(ros_msg.mask, sensor_msgs::image_encodings::MONO8);
 	}
 		catch (cv_bridge::Exception& e)
 	{
@@ -98,8 +104,8 @@ void PC_PUB_SUB::rosMaskImageCallback(const sensor_msgs::Image::ConstPtr &ros_ms
 		}
 		image_mat.push_back(temp_vec);
 	}
-
-    mask = image_mat;
+	object_name_ = ros_msg.name;
+    mask_ = image_mat;
 }
 
 void PC_PUB_SUB::processRosImage(const sensor_msgs::Image::ConstPtr &ros_msg, vector<vector<int> > &mask)
@@ -126,7 +132,7 @@ void PC_PUB_SUB::processRosImage(const sensor_msgs::Image::ConstPtr &ros_msg, ve
 		image_mat.push_back(temp_vec);
 	}
 
-    mask = image_mat;
+    mask_ = image_mat;
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr PC_PUB_SUB::getOrganizedCloudPtr()
@@ -135,9 +141,11 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr PC_PUB_SUB::getOrganizedCloudPtr()
 }
 
 vector< vector <int>> PC_PUB_SUB::getMask() {
-	return mask;
+	return mask_;
 }
-
+string PC_PUB_SUB::getName() {
+	return object_name_;
+}
 void PC_PUB_SUB::publishPointCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr pointCloud, string camera_frame) 
 {
 	sensor_msgs::PointCloud2::Ptr ros_msg(new sensor_msgs::PointCloud2);
@@ -174,6 +182,11 @@ void PC_PUB_SUB::publishObjectCentroidVector(const vector< double> &centroid)
    msg.point.y = centroid[1];
    msg.point.z = centroid[2];
    pub_object_centroid_.publish(msg);
+}
+
+void PC_PUB_SUB::publishObject(semantic_segmentation_ros::SegmentationObject object)
+{
+	pub_object_.publish(object);
 }
 
 void PC_PUB_SUB::visualizeCentorid(geometry_msgs::PointStamped point, string frame)

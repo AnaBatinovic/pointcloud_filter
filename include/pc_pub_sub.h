@@ -33,6 +33,11 @@
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
 
+// Segmentation msgs
+#include <semantic_segmentation_ros/SegmentationNameMask.h>
+#include <semantic_segmentation_ros/SegmentationObject.h>
+#include <semantic_segmentation_ros/SegmentationObjectArray.h>
+
 // Visualisation 
 #include <visualization_msgs/Marker.h>
 
@@ -52,27 +57,30 @@ class PC_PUB_SUB
             string filtered_pointcloud_pub_topic,
             string closest_point_distance_pub_topic,
             string object_centroid_pub_topic,
+			string object_pub_topic,
 			string object_marker_pub_topic);
 
 		virtual ~PC_PUB_SUB();
 
 		void registerPointCloudSubscriber(string topic);
-		void registerImageSubscriber(string topic);
+		void registerNameMaskSubscriber(string topic);
 		void registerPointCloudPublisher(string topic);
 		void registerDistancePublisher(string topic);
 		void registerObjectCentroidPublisher(string topic);
+		void registerObjectPublisher(string topic);
 		void visualizationPublisher (string topic);
 
 		void rosPointCloudCallback(const sensor_msgs::PointCloud2::ConstPtr& ros_msg);
 		void resetNewMeasurementFlag();
 		bool newMeasurementRecieved();
-		void rosMaskImageCallback(const sensor_msgs::Image::ConstPtr& ros_msg);
+		void rosNameMaskCallback(const semantic_segmentation_ros::SegmentationNameMask &ros_msg);
 
 		void publishPointCloud(
 			pcl::PointCloud<pcl::PointXYZ>::Ptr pointCloud, string camera_frame);
 		
 		void publishDistance(double distance);
 		void publishObjectCentroid(geometry_msgs::PointStamped centroid);
+		void publishObject(semantic_segmentation_ros::SegmentationObject object);
 		void publishObjectCentroidVector(const vector<double> &centroid);
 		void visualizeCentorid(geometry_msgs::PointStamped point, string frame);
 
@@ -80,6 +88,7 @@ class PC_PUB_SUB
 			
 		pcl::PointCloud<pcl::PointXYZ>::Ptr getOrganizedCloudPtr();
 		vector< vector <int>> getMask();
+		string getName();
 
 	private:
 		ros::NodeHandle nodeHandle_;
@@ -89,13 +98,15 @@ class PC_PUB_SUB
 		ros::Publisher pub_distance_;
 		ros::Publisher pub_object_centroid_;
 		ros::Publisher pub_patch_centroid_filtered_;
+		ros::Publisher pub_object_;
 		ros::Publisher pub_object_marker_;
 		
 		pcl::PointCloud<pcl::PointXYZ>::Ptr organizedCloudPtr;
-		vector< vector <int>> mask;
+		vector< vector <int>> mask_;
 		vector< vector <int>> patch_mask_;
 		double closest_point_distance;
 		bool _newMeasurement = false;
+		string object_name_;
 };
 
 #endif /* PC_PUB_SUB_H_ */

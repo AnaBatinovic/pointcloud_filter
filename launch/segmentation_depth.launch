@@ -2,7 +2,7 @@
     <arg name="namespace" default="$(env UAV_NAMESPACE)"/>
     
     <arg name="depth_topic" default="camera/depth_registered/points"/>
-    <arg name="mask_topic" default="segmentation/color/image_raw"/>
+    <arg name="mask_topic" default="segmentation/mask/image_raw"/>
     <arg name="world_frame" default="/mavros/world"/>
     <arg name="camera_frame" default="/red/camera"/>
 
