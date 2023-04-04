@@ -13,6 +13,7 @@
 void PointcloudFilter::filter ( int argc, char** argv, 
 								string pointcloud_sub_topic, 
 								string mask_sub_topic,
+								string mask_pub_topic,
 								string filtered_pointcloud_pub_topic, 
 								string closest_point_distance_pub_topic,
 								string object_centroid_pub_topic,
@@ -24,55 +25,66 @@ void PointcloudFilter::filter ( int argc, char** argv,
 	ros::init(argc, argv, "pc_filter");
 	ros::NodeHandle nodeHandle("~");
 
-	PC_PUB_SUB pcl_pub_sub(	nodeHandle, pointcloud_sub_topic, mask_sub_topic,
+	PC_PUB_SUB pcl_pub_sub(	nodeHandle, pointcloud_sub_topic, mask_sub_topic, mask_pub_topic,
 							filtered_pointcloud_pub_topic, closest_point_distance_pub_topic,
 						    object_centroid_pub_topic, object_pub_topic, object_marker_pub_topic);
 	ros::Rate loop_rate(20);
 	ros::Duration(3.0).sleep();
 	tf::TransformListener listener;
 	semantic_segmentation_ros::SegmentationObject object;
+	semantic_segmentation_ros::SegmentationObjectArray objectArray;
+
 	while(nodeHandle.ok())
 	{
 		ros::spinOnce();
 		loop_rate.sleep();
 		
 		pcXYZ::Ptr originalCloud = pcl_pub_sub.getOrganizedCloudPtr();
-
+		objectArray.objects.clear();
 		if(!originalCloud || originalCloud->points.size() == 0) {
 		continue;
 		}
 
-		pcXYZ::Ptr filteredCloud ( new pcXYZ ), maskCloud( new pcXYZ );
+		pcXYZ::Ptr accumulatedCloud (new pcXYZ);
+		// For each mask
+		for (int i = 0; i < pcl_pub_sub.getMask().size(); i++) {
 
-		filteredCloud = removeNonMaskValues(originalCloud, pcl_pub_sub.getMask());
-		// std::cout << "Point cloud size: " << filteredCloud->size() << std::endl;
-		filteredCloud = removeNaNValues(filteredCloud);
-		// Find object pose in camera frame
-		std::vector<double> minDistances, objectCentroid;
-		minDistances = findClosestDistance(filteredCloud);
-		objectCentroid = findCentroid(filteredCloud);
-		
-		// Transform centroid and distance to global frame
-		geometry_msgs::PointStamped objectTransformedCentroid;
-		objectTransformedCentroid = transformCentroid(objectCentroid, world_frame, 
-			camera_frame, listener);
-		
-		// Publish the absolute distance
-		pcl_pub_sub.publishDistance(minDistances[3]);
-		// Publish object centroid in global frame
-		pcl_pub_sub.publishObjectCentroid(objectTransformedCentroid);
-		pcl_pub_sub.visualizeCentorid(objectTransformedCentroid, world_frame);
+			pcXYZ::Ptr filteredCloud ( new pcXYZ ), maskCloud( new pcXYZ );
 
-		// std::cout << "Point cloud size: " << maskCloud->size() << std::endl;
-		// Transform filtered cloud and publish it
-		pcXYZ::Ptr transformedFilteredCloud (new pcXYZ);
-		transformedFilteredCloud = transformCloud(filteredCloud, world_frame, listener);
-		pcl_pub_sub.publishPointCloud(transformedFilteredCloud, world_frame);
+			filteredCloud = removeNonMaskValues(originalCloud, pcl_pub_sub.getMask().at(i));
+			// std::cout << "Point cloud size: " << filteredCloud->size() << std::endl;
+			filteredCloud = removeNaNValues(filteredCloud);
+			// Find object pose in camera frame
+			std::vector<double> minDistances, objectCentroid;
+			minDistances = findClosestDistance(filteredCloud);
+			objectCentroid = findCentroid(filteredCloud);
+			
+			// Transform centroid and distance to global frame
+			geometry_msgs::PointStamped objectTransformedCentroid;
+			objectTransformedCentroid = transformCentroid(objectCentroid, world_frame, 
+				camera_frame, listener);
+			
+			// Publish the absolute distance
+			pcl_pub_sub.publishDistance(minDistances[3]);
+			// Publish object centroid in global frame
+			pcl_pub_sub.publishObjectCentroid(objectTransformedCentroid);
+			pcl_pub_sub.visualizeCentorid(objectTransformedCentroid, world_frame, i+1);
 
-		// Publish SegmenatationObject
-		object.name = pcl_pub_sub.getName();
-		object.point = objectTransformedCentroid;
-		pcl_pub_sub.publishObject(object);
+			// std::cout << "Point cloud size: " << maskCloud->size() << std::endl;
+			// Transform filtered cloud and publish it
+			pcXYZ::Ptr transformedFilteredCloud (new pcXYZ);
+			transformedFilteredCloud = transformCloud(filteredCloud, world_frame, listener);
+			*accumulatedCloud += *transformedFilteredCloud;
+			pcl_pub_sub.publishPointCloud(accumulatedCloud, world_frame);
+
+			// Publish SegmenatationObject
+			object.name = pcl_pub_sub.getName().at(i);
+			object.point = objectTransformedCentroid;
+
+			objectArray.objects.push_back(object);
+
+		}
+		pcl_pub_sub.publishObjectArray(objectArray);
 	}
 }
 

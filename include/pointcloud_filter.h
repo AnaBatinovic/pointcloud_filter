@@ -22,7 +22,7 @@ typedef pcl::PointCloud<pcl::PointXYZ> pcXYZ;
 namespace PointcloudFilter {
 
 	void filter ( int argc, char** argv, string pointcloud_sub_topic, 
-					string mask_sub_topic, string filtered_pointcloud_pub_topic, 
+					string mask_sub_topic, string mask_pub_topic, string filtered_pointcloud_pub_topic, 
 					string closest_point_distance_pub_topic,
 					string object_centroid_pub_topic,
 					string object_pub_topic,
@@ -59,7 +59,7 @@ namespace PointcloudFilter {
       */
     std::vector<double> findCentroid(pcXYZ::Ptr inputCloud);
 
-	void visualizeCentorid(geometry_msgs::PointStamped point, string frame);
+	void visualizeCentorid(geometry_msgs::PointStamped point, string frame, int number);
 	
 };
 
