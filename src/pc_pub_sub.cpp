@@ -52,7 +52,7 @@ void PC_PUB_SUB::registerObjectCentroidPublisher(string topic)
 }
 void PC_PUB_SUB::registerObjectArrayPublisher(string topic)
 {
-    pub_object_ = nodeHandle_.advertise<semantic_segmentation_ros::SegmentationObject>(topic, 1000);
+    pub_object_ = nodeHandle_.advertise<semantic_segmentation_ros::SegmentationObjectArray>(topic, 10);
 }
 void PC_PUB_SUB::visualizationPublisher(string topic)
 {

@@ -12,7 +12,7 @@ int main(int argc, char** argv) {
 	string filtered_pointcloud_pub_topic = "pc_filter/points";
 	string closest_point_distance_pub_topic = "pc_filter/closest_point_distance";
 	string object_centroid_pub_topic = "pc_filter/object_centroid";
-	string object_pub_topic = "pc_filter/object";
+	string object_pub_topic = "pc_filter/object/array";
 	string object_marker_pub_topic = "pc_filter/object_centroid_marker";
 	string camera_frame = "red/camera";
 	string world_frame = "mavros/world";
