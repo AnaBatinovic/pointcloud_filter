@@ -42,9 +42,13 @@ void PointcloudFilter::filter ( int argc, char** argv,
 		pcXYZ::Ptr originalCloud = pcl_pub_sub.getOrganizedCloudPtr();
 		objectArray.objects.clear();
 		if(!originalCloud || originalCloud->points.size() == 0) {
-		continue;
+			ROS_WARN_THROTTLE(1.0, "Point cloud not received!");
+			continue;
 		}
-
+		if(pcl_pub_sub.getMask().size() == 0) {
+			ROS_WARN_THROTTLE(1.0, "Mask not received!");
+			continue;
+		}
 		pcXYZ::Ptr accumulatedCloud (new pcXYZ);
 		// For each mask
 		for (int i = 0; i < pcl_pub_sub.getMask().size(); i++) {
@@ -67,9 +71,13 @@ void PointcloudFilter::filter ( int argc, char** argv,
 			// Publish the absolute distance
 			pcl_pub_sub.publishDistance(minDistances[3]);
 			// Publish object centroid in global frame
-			pcl_pub_sub.publishObjectCentroid(objectTransformedCentroid);
-			pcl_pub_sub.visualizeCentorid(objectTransformedCentroid, world_frame, i+1);
-
+			if (!(objectTransformedCentroid.point.x == 0 &&
+				objectTransformedCentroid.point.y == 0 &&
+				objectTransformedCentroid.point.z == 0))
+			{
+				pcl_pub_sub.publishObjectCentroid(objectTransformedCentroid);
+				pcl_pub_sub.visualizeCentorid(objectTransformedCentroid, world_frame, i+1);
+			}
 			// std::cout << "Point cloud size: " << maskCloud->size() << std::endl;
 			// Transform filtered cloud and publish it
 			pcXYZ::Ptr transformedFilteredCloud (new pcXYZ);
@@ -92,6 +100,7 @@ geometry_msgs::PointStamped PointcloudFilter::transformCentroid(
 	std::vector<double> centroid, string world_frame, 
 	string camera_frame, tf::TransformListener &tf_listener) 
 {
+	if (centroid.empty()) return geometry_msgs::PointStamped();
 	try
 	{
 		ros::Time now = ros::Time::now();
@@ -188,7 +197,8 @@ std::vector<double> PointcloudFilter::findClosestDistance(pcXYZ::Ptr inputCloud)
 std::vector<double> PointcloudFilter::findCentroid(pcXYZ::Ptr inputCloud)
 {
     std::vector<double> centroid{0,0,0};
-    if (!inputCloud || inputCloud->points.size() == 0) return std::vector<double>{-1, -1, -1};
+	// Return an empty vector
+    if (!inputCloud || inputCloud->points.size() == 0) return std::vector<double>();
     else {
         for (int i = 0; i < inputCloud->points.size(); i++) {
             centroid[0] += inputCloud->points[i].x;
