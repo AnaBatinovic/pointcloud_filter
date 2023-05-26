@@ -25,6 +25,13 @@ void PointcloudFilter::filter ( int argc, char** argv,
 	ros::init(argc, argv, "pc_filter");
 	ros::NodeHandle nodeHandle("~");
 
+	// Read params from launch files
+	// string pointcloud_sub_topic, mask_sub_topic, camera_frame, world_frame;
+    nodeHandle.param<string>("depth_topic", pointcloud_sub_topic, "depth_point_cloud");
+	nodeHandle.param<string>("mask_topic", mask_sub_topic, "mask");
+	nodeHandle.param<string>("camera_frame", camera_frame, "camera");
+	nodeHandle.param<string>("world_frame", world_frame, "world");
+
 	PC_PUB_SUB pcl_pub_sub(	nodeHandle, pointcloud_sub_topic, mask_sub_topic, mask_pub_topic,
 							filtered_pointcloud_pub_topic, closest_point_distance_pub_topic,
 						    object_centroid_pub_topic, object_pub_topic, object_marker_pub_topic);
