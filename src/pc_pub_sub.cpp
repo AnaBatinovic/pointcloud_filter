@@ -56,7 +56,7 @@ void PC_PUB_SUB::registerObjectArrayPublisher(string topic)
 }
 void PC_PUB_SUB::visualizationPublisher(string topic)
 {
-	pub_object_marker_ = nodeHandle_.advertise<visualization_msgs::Marker>(topic, 10);	
+	pub_object_marker_ = nodeHandle_.advertise<visualization_msgs::MarkerArray>(topic, 1);	
 } 
 void PC_PUB_SUB::rosPointCloudCallback(const sensor_msgs::PointCloud2::ConstPtr& ros_msg) 
 {
@@ -210,30 +210,32 @@ void PC_PUB_SUB::publishObjectArray(semantic_segmentation_ros::SegmentationObjec
 }
 
 
-void PC_PUB_SUB::visualizeCentorid(geometry_msgs::PointStamped point, string frame, int number)
+void PC_PUB_SUB::visualizeObjectArray(semantic_segmentation_ros::SegmentationObjectArray object_array, string frame)
 {
-	// Visualisation marker
-	visualization_msgs::Marker marker;
-	marker.header.stamp = ros::Time::now();
-	marker.header.frame_id = frame;
-	marker.id = 1;
-	marker.ns = "point" + std::to_string(number);
-	marker.type = 2;
-	marker.action = 0;
-	marker.pose.position.x = point.point.x;
-	marker.pose.position.y = point.point.y;
-	marker.pose.position.z = point.point.z;
-	marker.pose.orientation.x = 0.0;
-	marker.pose.orientation.y = 0.0;
-	marker.pose.orientation.z = 0.0;
-	marker.pose.orientation.w = 1.0;
-	marker.scale.x = 0.25;
-	marker.scale.y = 0.25;
-	marker.scale.z = 0.25;
-	marker.color.a = 1.0;
-	marker.color.r = 1.0 / number; 
-	marker.color.g = 0.549;
-	marker.color.b = 0.0;
-	marker.lifetime = ros::Duration(10);
-	pub_object_marker_.publish(marker);
+	// Create a MarkerArray message
+    visualization_msgs::MarkerArray marker_array;
+
+    // Create a few markers and add them to the MarkerArray
+    for (int i = 0; i < object_array.objects.size(); ++i) {
+        visualization_msgs::Marker marker;
+        marker.header.frame_id = frame;
+        marker.header.stamp = ros::Time::now();
+        marker.ns = "objects";
+        marker.id = i;
+        marker.type = visualization_msgs::Marker::SPHERE;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.pose.position.x = object_array.objects[i].point.point.x;
+        marker.pose.position.y = object_array.objects[i].point.point.y;
+        marker.pose.position.z = object_array.objects[i].point.point.z;
+        marker.scale.x = 0.25;
+        marker.scale.y = 0.25;
+        marker.scale.z = 0.25;
+        marker.color.r = 1.0;
+        marker.color.g = 0.549;
+        marker.color.b = 0.0;
+        marker.color.a = 1.0;
+
+        marker_array.markers.push_back(marker);
+    }
+	pub_object_marker_.publish(marker_array);
 }

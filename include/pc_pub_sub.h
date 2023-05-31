@@ -42,6 +42,7 @@
 
 // Visualisation 
 #include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
 #include <vector>
 
@@ -87,7 +88,7 @@ class PC_PUB_SUB
 		void publishObjectCentroid(geometry_msgs::PointStamped centroid);
 		void publishObjectArray(semantic_segmentation_ros::SegmentationObjectArray object_array);
 		void publishObjectCentroidVector(const vector<double> &centroid);
-		void visualizeCentorid(geometry_msgs::PointStamped point, string frame, int number);
+		void visualizeObjectArray(semantic_segmentation_ros::SegmentationObjectArray object_array, string frame);
 
 		void processRosImage(const sensor_msgs::Image::ConstPtr& ros_msg, vector < vector <int>> & mask);
 			

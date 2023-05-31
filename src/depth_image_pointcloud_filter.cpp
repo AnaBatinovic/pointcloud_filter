@@ -47,7 +47,7 @@ void PointcloudFilter::filter ( int argc, char** argv,
 		loop_rate.sleep();
 		
 		pcXYZ::Ptr originalCloud = pcl_pub_sub.getOrganizedCloudPtr();
-		objectArray.objects.clear();
+		// objectArray.objects.clear();
 		if(!originalCloud || originalCloud->points.size() == 0) {
 			ROS_WARN_THROTTLE(1.0, "Point cloud not received!");
 			continue;
@@ -74,31 +74,30 @@ void PointcloudFilter::filter ( int argc, char** argv,
 			geometry_msgs::PointStamped objectTransformedCentroid;
 			objectTransformedCentroid = transformCentroid(objectCentroid, world_frame, 
 				camera_frame, listener);
-			
+
+			object.name = pcl_pub_sub.getName().at(i);
+			object.point = objectTransformedCentroid;
+			//  Check if the centroid is already in the objectArray and updated
+			if (!updateCentroidAveragePositionAndReturnIfSuccessful(objectArray, object))
+			{
+				// If false, add the current centroid to the objectArray
+				objectArray.objects.push_back(object);
+			}	
+
 			// Publish the absolute distance
 			pcl_pub_sub.publishDistance(minDistances[3]);
-			// Publish object centroid in global frame
-			if (!(objectTransformedCentroid.point.x == 0 &&
-				objectTransformedCentroid.point.y == 0 &&
-				objectTransformedCentroid.point.z == 0))
-			{
-				pcl_pub_sub.publishObjectCentroid(objectTransformedCentroid);
-				pcl_pub_sub.visualizeCentorid(objectTransformedCentroid, world_frame, i+1);
-			}
+			
 			// std::cout << "Point cloud size: " << maskCloud->size() << std::endl;
 			// Transform filtered cloud and publish it
 			pcXYZ::Ptr transformedFilteredCloud (new pcXYZ);
 			transformedFilteredCloud = transformCloud(filteredCloud, world_frame, listener);
 			*accumulatedCloud += *transformedFilteredCloud;
 			pcl_pub_sub.publishPointCloud(accumulatedCloud, world_frame);
-
-			// Publish SegmenatationObject
-			object.name = pcl_pub_sub.getName().at(i);
-			object.point = objectTransformedCentroid;
-
-			objectArray.objects.push_back(object);
-
 		}
+		// Visualize object array in global frame
+		// pcl_pub_sub.publishObjectCentroid(objectTransformedCentroid);
+		pcl_pub_sub.visualizeObjectArray(objectArray, world_frame);
+		// Publish SegmenatationObject
 		pcl_pub_sub.publishObjectArray(objectArray);
 	}
 }
@@ -217,6 +216,38 @@ std::vector<double> PointcloudFilter::findCentroid(pcXYZ::Ptr inputCloud)
         centroid[2] /= inputCloud->points.size();
     }
     return centroid;
+}
+
+bool PointcloudFilter::updateCentroidAveragePositionAndReturnIfSuccessful(
+		semantic_segmentation_ros::SegmentationObjectArray &objectArray, 
+		semantic_segmentation_ros::SegmentationObject &object)
+{
+	double objectRadius = 2.0;
+	// if (!(object.point.point.x == 0 && object.point.point.y == 0 && object.point.point.z == 0))
+	// {
+
+	// }
+	// Check if new centroid exist in the list 
+	for (int i = 0; i < objectArray.objects.size(); i++)
+	{
+		if (objectArray.objects[i].name == object.name &&
+		fabs(objectArray.objects[i].point.point.x - object.point.point.x) < objectRadius &&
+		fabs(objectArray.objects[i].point.point.y - object.point.point.y) < objectRadius &&
+		fabs(objectArray.objects[i].point.point.z - object.point.point.z) < objectRadius) 
+		{
+			// Point is inside the radius, update the position
+			ROS_WARN("Object already in the array. Update position.");
+			// Update the average position u
+			objectArray.objects[i].point.point.x = 
+				(objectArray.objects[i].point.point.x + object.point.point.x) / 2;
+			objectArray.objects[i].point.point.y = 
+				(objectArray.objects[i].point.point.y + object.point.point.y) / 2;
+			objectArray.objects[i].point.point.z = 
+				(objectArray.objects[i].point.point.z + object.point.point.z) / 2;
+			return true;
+		}
+	}
+	return false;	
 }
 
 vector <Eigen::Vector3d> PointcloudFilter::pointIndicesToInlierPoints (

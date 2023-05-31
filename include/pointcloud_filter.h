@@ -59,8 +59,12 @@ namespace PointcloudFilter {
       */
     std::vector<double> findCentroid(pcXYZ::Ptr inputCloud);
 
-	void visualizeCentorid(geometry_msgs::PointStamped point, string frame, int number);
-	
+	/**
+     * Updates average position of the centroid
+     */
+	bool updateCentroidAveragePositionAndReturnIfSuccessful(
+		semantic_segmentation_ros::SegmentationObjectArray &objectArray,
+		semantic_segmentation_ros::SegmentationObject &object);
 };
 
 
