@@ -217,6 +217,7 @@ void PC_PUB_SUB::visualizeObjectArray(semantic_segmentation_ros::SegmentationObj
 
     // Create a few markers and add them to the MarkerArray
     for (int i = 0; i < object_array.objects.size(); ++i) {
+		int color_index = dictionary[object_array.objects[i].name];
         visualization_msgs::Marker marker;
         marker.header.frame_id = frame;
         marker.header.stamp = ros::Time::now();
@@ -227,12 +228,12 @@ void PC_PUB_SUB::visualizeObjectArray(semantic_segmentation_ros::SegmentationObj
         marker.pose.position.x = object_array.objects[i].point.point.x;
         marker.pose.position.y = object_array.objects[i].point.point.y;
         marker.pose.position.z = object_array.objects[i].point.point.z;
-        marker.scale.x = 0.25;
-        marker.scale.y = 0.25;
-        marker.scale.z = 0.25;
-        marker.color.r = 1.0;
-        marker.color.g = 0.549;
-        marker.color.b = 0.0;
+        marker.scale.x = 0.4;
+        marker.scale.y = 0.4;
+        marker.scale.z = 0.4;
+        marker.color.r = color_index;
+        marker.color.g = color_index%2 + 0.5;
+        marker.color.b = color_index/2;
         marker.color.a = 1.0;
 
         marker_array.markers.push_back(marker);

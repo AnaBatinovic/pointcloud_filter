@@ -117,6 +117,11 @@ class PC_PUB_SUB
 		bool _newMeasurement = false;
 		string object_name_;
 		vector <string> object_name_array_;
+		std::map<std::string, int> dictionary = {
+        {"box", 1},
+        {"door", 2},
+        {"shelf", 3},
+		{"stairs", 4}};
 };
 
 #endif /* PC_PUB_SUB_H_ */
