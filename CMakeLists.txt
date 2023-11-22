@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(pointcloud_filter)
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -12,10 +13,10 @@ find_package(catkin REQUIRED COMPONENTS
   semantic_segmentation_ros
 )
 
-find_package(PCL 1.7 REQUIRED)
+find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
 
-add_compile_options(-std=c++11)
+#add_compile_options(-std=c++11)
 
 catkin_package(
 #  INCLUDE_DIRS include
