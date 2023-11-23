@@ -87,13 +87,17 @@ void PC_PUB_SUB::rosNameMaskCallback(const semantic_segmentation_ros::Segmentati
 	mask_array_.clear();
 	cv_bridge::CvImagePtr cv_ptr;
 	
-	// Get every mask and name and fill out vectors 
+	// Get every mask and name and fill out vectors
+	// std::cout << "Mask size: " <<  ros_msg.masks.size() << std::endl;
 	for (int i = 0; i < ros_msg.masks.size(); i++) {
 		try
 		{
 			// publishTestImage(ros_msg.masks.at(0).mask);
-			// publishTestImage(ros_msg.masks.at(1).mask);
-			cv_ptr = cv_bridge::toCvCopy(ros_msg.masks.at(i).mask, sensor_msgs::image_encodings::MONO8);
+			std::string encoding = ros_msg.masks.at(i).mask.encoding;
+			if (encoding == "bgr8")
+				cv_ptr = cv_bridge::toCvCopy(ros_msg.masks.at(i).mask, sensor_msgs::image_encodings::BGR8);
+			else if (encoding == "mono8")	
+				cv_ptr = cv_bridge::toCvCopy(ros_msg.masks.at(i).mask, sensor_msgs::image_encodings::MONO8);
 		}
 			catch (cv_bridge::Exception& e)
 		{
@@ -120,7 +124,7 @@ void PC_PUB_SUB::rosNameMaskCallback(const semantic_segmentation_ros::Segmentati
 			image_mat.push_back(temp_vec);
 		}
 		object_name_ = ros_msg.masks.at(i).name;
-		mask_ = image_mat;	
+		mask_ = image_mat;
 		object_name_array_.push_back(object_name_);
 		mask_array_.push_back(mask_);
 	}
