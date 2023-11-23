@@ -1,12 +1,12 @@
 <launch>
     <arg name="namespace" default="$(env UAV_NAMESPACE)"/>
-    <arg name="depth_topic" default="camera/depth_registered/points"/>
+    <arg name="depth_topic" default="/camera/depth/color/points"/>
     <arg name="mask_topic" default="segmentation/mask"/>
-    <arg name="world_frame" default="world"/>
-    <arg name="camera_frame" default="red/camera"/>
+    <arg name="world_frame" default="map"/>
+    <arg name="camera_frame" default="camera_color_optical_frame"/>
 
     <node name="pointcloud_filter" type="pointcloud_filter" pkg="pointcloud_filter" ns="$(arg namespace)" output="screen">
-        <param name="depth_topic" value="/$(arg namespace)/$(arg depth_topic)"/>
+        <param name="depth_topic" value="$(arg depth_topic)"/>
         <param name="mask_topic" value="/$(arg namespace)/$(arg mask_topic)"/>
         <param name="world_frame" value="/$(arg world_frame)"/>
         <param name="camera_frame" value="/$(arg camera_frame)"/>

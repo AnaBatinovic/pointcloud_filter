@@ -222,8 +222,9 @@ bool PointcloudFilter::updateCentroidAveragePositionAndReturnIfSuccessful(
 		semantic_segmentation_ros::SegmentationObjectArray &objectArray, 
 		semantic_segmentation_ros::SegmentationObject &object)
 {
-	double objectRadius = 2.0;
-	// if (!(object.point.point.x == 0 && object.point.point.y == 0 && object.point.point.z == 0))
+	double objectRadius = 3.0;
+	// Do not add object that are above 3.0 meteres
+	// if (object.point.point.z > 6.0) return true;
 	// {
 
 	// }
